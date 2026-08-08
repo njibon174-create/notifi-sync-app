@@ -1,0 +1,3 @@
+# Copy this file to local.properties and fill in your own values.
+SUPABASE_URL=https://epqakuroqjtrhhcyweoa.supabase.co
+SUPABASE_ANON_KEY=your-anon-key-here

@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">Notification Sync</string>
+    <string name="login">Login</string>
+    <string name="sign_up">Sign Up</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="device_name">Device Name</string>
+    <string name="register_device">Register Device</string>
+    <string name="logout">Logout</string>
+    <string name="welcome">Welcome</string>
+    <string name="logged_in_as">Logged in as</string>
+    <string name="device_registered">Device registered</string>
+    <string name="no_device_registered">No device registered</string>
+    <string name="enter_device_name">Enter a name for this device</string>
+    <string name="error_invalid_credentials">Invalid email or password</string>
+    <string name="error_email_invalid">Invalid email format</string>
+    <string name="error_email_rate_limit">Email rate limit exceeded. Please try again later.</string>
+    <string name="error_network">Network error. Please check your connection.</string>
+    <string name="error_unknown">An unexpected error occurred</string>
+    <string name="error_device_name_required">Device name is required</string>
+    <string name="error_session_expired">Session expired. Please log in again.</string>
+</resources>
