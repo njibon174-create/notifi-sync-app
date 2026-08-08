@@ -202,15 +202,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun mapError(t: Throwable): String {
-        val msg = t.message ?: t.toString()
-        return when {
-            msg.contains("invalid_credentials", ignoreCase = true) -> "Invalid email or password"
-            msg.contains("email_address_invalid", ignoreCase = true) -> "Invalid email format"
-            msg.contains("over_email_send_rate_limit", ignoreCase = true) -> "Email rate limit exceeded. Please try later."
-            msg.contains("permission denied", ignoreCase = true) -> "Permission denied. Please log in again."
-            msg.contains("network", ignoreCase = true) || msg.contains("timeout", ignoreCase = true) -> "Network error. Please check your connection."
-            else -> msg
-        }
+        val type = t::class.java.simpleName
+        val msg = t.message?.takeIf { it.isNotBlank() } ?: t.toString()
+        return "$type: $msg"
     }
 }
 
