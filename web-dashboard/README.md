@@ -54,3 +54,4 @@ This project is ready for a static Vercel deployment.
 - Click a notification to mark it read
 - Realtime subscription for new notifications
 - Load-more pagination
+- Delete individual notifications, clear all notifications, and remove devices (device deletion cascades to notifications)

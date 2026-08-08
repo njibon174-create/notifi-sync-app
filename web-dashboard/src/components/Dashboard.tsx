@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import { matchesSearch } from '../lib/format'
+import { formatTimestamp, matchesSearch } from '../lib/format'
 import type { Device, NotificationRow, NotificationType } from '../types'
 import { Filters } from './Filters'
 import { NotificationCard } from './NotificationCard'
@@ -24,6 +24,9 @@ export function Dashboard({ user }: Props) {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [deletingDeviceIds, setDeletingDeviceIds] = useState<Record<string, boolean>>({})
+  const [deletingNotificationIds, setDeletingNotificationIds] = useState<Record<string, boolean>>({})
 
   const fetchDevices = useCallback(async () => {
     const { data, error } = await supabase
@@ -35,6 +38,7 @@ export function Dashboard({ user }: Props) {
       setError(error.message)
       return
     }
+
     setDevices((data ?? []) as Device[])
   }, [])
 
@@ -71,7 +75,7 @@ export function Dashboard({ user }: Props) {
   )
 
   useEffect(() => {
-    fetchDevices().catch((error: Error) => setError(error.message))
+    fetchDevices().catch((err: Error) => setError(err.message))
   }, [fetchDevices])
 
   useEffect(() => {
@@ -119,6 +123,14 @@ export function Dashboard({ user }: Props) {
 
   const unreadCount = notifications.filter((notification) => !notification.is_read).length
 
+  function setNotificationDeleting(id: string, value: boolean) {
+    setDeletingNotificationIds((current) => ({ ...current, [id]: value }))
+  }
+
+  function setDeviceDeleting(id: string, value: boolean) {
+    setDeletingDeviceIds((current) => ({ ...current, [id]: value }))
+  }
+
   async function markAsRead(notification: NotificationRow) {
     if (notification.is_read) return
 
@@ -139,6 +151,77 @@ export function Dashboard({ user }: Props) {
     }
   }
 
+  async function deleteNotification(notification: NotificationRow) {
+    if (!window.confirm('Delete this notification permanently? This cannot be undone.')) return
+
+    setError(null)
+    setNotificationDeleting(notification.id, true)
+
+    const snapshot = notifications
+    setNotifications((current) => current.filter((item) => item.id !== notification.id))
+
+    const { error } = await supabase.from('notifications').delete().eq('id', notification.id)
+
+    setNotificationDeleting(notification.id, false)
+
+    if (error) {
+      setError(error.message)
+      setNotifications(snapshot)
+    }
+  }
+
+  async function deleteAllNotifications() {
+    if (
+      !window.confirm(
+        'Delete ALL notifications for your account? This is permanent and cannot be undone.',
+      )
+    ) {
+      return
+    }
+
+    setBulkDeleting(true)
+    setError(null)
+
+    const snapshot = notifications
+    setNotifications([])
+    setHasMore(false)
+
+    const { error } = await supabase.from('notifications').delete().eq('user_id', user.id)
+
+    setBulkDeleting(false)
+
+    if (error) {
+      setError(error.message)
+      setNotifications(snapshot)
+      setHasMore(snapshot.length === PAGE_SIZE)
+    }
+  }
+
+  async function removeDevice(device: Device) {
+    const confirmText = `Removing ${device.device_name} will also delete all notifications that came from it. This cannot be undone.`
+    if (!window.confirm(confirmText)) return
+
+    setError(null)
+    setDeviceDeleting(device.id, true)
+
+    const deviceSnapshot = devices
+    const notificationSnapshot = notifications
+
+    setDevices((current) => current.filter((item) => item.id !== device.id))
+    setNotifications((current) => current.filter((item) => item.device_id !== device.id))
+    if (deviceId === device.id) setDeviceId('all')
+
+    const { error } = await supabase.from('devices').delete().eq('id', device.id)
+
+    setDeviceDeleting(device.id, false)
+
+    if (error) {
+      setError(error.message)
+      setDevices(deviceSnapshot)
+      setNotifications(notificationSnapshot)
+    }
+  }
+
   async function logout() {
     await supabase.auth.signOut()
   }
@@ -151,9 +234,14 @@ export function Dashboard({ user }: Props) {
           <h1>All synced notifications</h1>
           <p className="muted">Signed in as {user.email}</p>
         </div>
-        <button className="secondary-button" onClick={logout} type="button">
-          Logout
-        </button>
+        <div className="header-actions">
+          <button className="secondary-button danger-button" onClick={deleteAllNotifications} type="button" disabled={bulkDeleting}>
+            {bulkDeleting ? 'Deleting…' : 'Clear all notifications'}
+          </button>
+          <button className="secondary-button" onClick={logout} type="button">
+            Logout
+          </button>
+        </div>
       </header>
 
       <section className="stats-grid">
@@ -181,6 +269,43 @@ export function Dashboard({ user }: Props) {
         onSearchChange={setSearch}
       />
 
+      <section className="panel-section">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Manage devices</p>
+            <h2>Registered devices</h2>
+          </div>
+          <p className="muted">Remove a phone to delete its synced notifications too.</p>
+        </div>
+
+        {devices.length === 0 ? (
+          <div className="empty-state compact">
+            <strong>No devices registered</strong>
+            <span>Once an Android collector registers, it will appear here.</span>
+          </div>
+        ) : (
+          <div className="device-list">
+            {devices.map((device) => (
+              <article className="device-row" key={device.id}>
+                <div className="device-details">
+                  <strong>{device.device_name}</strong>
+                  <span>{device.device_model || 'No model set'}</span>
+                  <span>Last active: {formatTimestamp(device.last_active)}</span>
+                </div>
+                <button
+                  className="secondary-button danger-button small-button"
+                  type="button"
+                  disabled={deletingDeviceIds[device.id]}
+                  onClick={() => removeDevice(device)}
+                >
+                  {deletingDeviceIds[device.id] ? 'Removing…' : 'Remove'}
+                </button>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
       {error && <div className="error-box">{error}</div>}
 
       <section className="notification-list" aria-live="polite">
@@ -197,6 +322,8 @@ export function Dashboard({ user }: Props) {
               key={notification.id}
               notification={notification}
               onOpen={markAsRead}
+              onDelete={deleteNotification}
+              deleting={Boolean(deletingNotificationIds[notification.id])}
             />
           ))
         )}
