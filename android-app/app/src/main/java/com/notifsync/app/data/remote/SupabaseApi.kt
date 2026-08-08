@@ -1,5 +1,6 @@
 package com.notifsync.app.data.remote
 
+import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
@@ -20,6 +21,13 @@ class SupabaseApi(
     private val supabaseUrl: String,
     private val anonKey: String
 ) {
+    init {
+        Log.i(
+            "SupabaseApi",
+            "Initialized: url=${supabaseUrl.takeIf { it.isNotBlank() } ?: "<empty>"}, anonKeyPresent=${anonKey.isNotBlank()}"
+        )
+    }
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -101,6 +109,7 @@ class SupabaseApi(
         val response = client.newCall(request).execute()
         val bodyString = response.body?.string().orEmpty()
         if (!response.isSuccessful) {
+            Log.e("SupabaseApi", "HTTP ${response.code} for $url: ${bodyString.take(500)}")
             throw SupabaseException(parseError(bodyString))
         }
         return parser(bodyString)

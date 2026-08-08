@@ -1,6 +1,7 @@
 package com.notifsync.app
 
 import android.content.Context
+import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.notifsync.app.data.SupabaseRepository
@@ -25,6 +26,10 @@ class AppContainer(context: Context) {
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
         sessionStore = SessionStore(prefs)
+        Log.i(
+            "SupabaseConfig",
+            "Loaded config: url=${BuildConfig.SUPABASE_URL.takeIf { it.isNotBlank() } ?: "<empty>"}, anonKeyPresent=${BuildConfig.SUPABASE_ANON_KEY.isNotBlank()}"
+        )
         api = SupabaseApi(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_ANON_KEY)
         repository = SupabaseRepository(api, sessionStore)
     }

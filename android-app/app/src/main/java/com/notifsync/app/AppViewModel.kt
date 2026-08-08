@@ -2,6 +2,7 @@ package com.notifsync.app
 
 import android.app.Application
 import android.os.Build
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.notifsync.app.data.SupabaseRepository
@@ -86,6 +87,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
                 clearToAuth()
             } catch (e: Exception) {
+                Log.e("AuthFlow", "Session check failed", e)
                 clearToAuth(error = mapError(e))
             }
         }
@@ -139,6 +141,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 setScreen(if (sessionStore.hasRegisteredDevice()) Screen.Home else Screen.DeviceRegistration)
             } catch (e: Exception) {
+                Log.e("AuthFlow", "Auth submit failed", e)
                 clearToAuth(error = mapError(e))
             }
         }
@@ -168,6 +171,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 setScreen(Screen.Home)
             } catch (e: Exception) {
+                Log.e("AuthFlow", "Device registration failed", e)
                 clearToAuth(error = mapError(e))
             }
         }
