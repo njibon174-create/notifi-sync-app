@@ -13,8 +13,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,7 +51,6 @@ fun LoginScreen(
             onValueChange = onEmailChange,
             modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
             error = state.error?.takeIf { it.contains("email", ignoreCase = true) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             placeholder = "you@example.com"
         )
 
@@ -63,7 +60,6 @@ fun LoginScreen(
             onValueChange = onPasswordChange,
             modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
             error = state.error?.takeIf { it.contains("password", ignoreCase = true) || it.contains("credential", ignoreCase = true) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             visualTransformation = PasswordVisualTransformation(),
             placeholder = "••••••••"
         )
