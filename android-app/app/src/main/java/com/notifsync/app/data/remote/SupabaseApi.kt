@@ -133,7 +133,7 @@ class SupabaseApi(
             parser(bodyString)
         } catch (e: IOException) {
             // Log full exception chain for ConnectException debugging
-            var cause = e
+            var cause: Throwable? = e
             var depth = 0
             while (cause != null && depth < 10) {
                 Log.e("SupabaseApi", "Exception chain depth=$depth: ${cause::class.java.name}: ${cause.message}", cause)
