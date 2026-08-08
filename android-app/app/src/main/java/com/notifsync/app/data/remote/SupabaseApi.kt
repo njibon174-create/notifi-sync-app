@@ -123,25 +123,13 @@ class SupabaseApi(
         }
 
         val request = reqBuilder.post(requestBody).build()
-        try {
-            val response = client.newCall(request).execute()
-            val bodyString = response.body?.string().orEmpty()
-            if (!response.isSuccessful) {
-                Log.e("SupabaseApi", "HTTP ${response.code} for $url: ${bodyString.take(500)}")
-                throw SupabaseException(parseError(bodyString))
-            }
-            parser(bodyString)
-        } catch (e: IOException) {
-            // Log full exception chain for ConnectException debugging
-            var cause: Throwable? = e
-            var depth = 0
-            while (cause != null && depth < 10) {
-                Log.e("SupabaseApi", "Exception chain depth=$depth: ${cause::class.java.name}: ${cause.message}", cause)
-                cause = cause.cause
-                depth++
-            }
-            throw e
+        val response = client.newCall(request).execute()
+        val bodyString = response.body?.string().orEmpty()
+        if (!response.isSuccessful) {
+            Log.e("SupabaseApi", "HTTP ${response.code} for $url: ${bodyString.take(500)}")
+            throw SupabaseException(parseError(bodyString))
         }
+        parser(bodyString)
     }
 
     private fun parseError(body: String): String {
