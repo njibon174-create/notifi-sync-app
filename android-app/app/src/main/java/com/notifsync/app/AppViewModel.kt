@@ -1,8 +1,12 @@
 package com.notifsync.app
 
 import android.app.Application
+import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.notifsync.app.data.SupabaseRepository
@@ -45,6 +49,34 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateDeviceName(value: String) {
         _uiState.update { it.copy(deviceName = value, error = null) }
+    }
+
+    fun openAppWhitelist() {
+        _uiState.update { it.copy(screen = Screen.AppWhitelist) }
+    }
+
+    fun showHome() {
+        _uiState.update { it.copy(screen = if (sessionStore.hasRegisteredDevice()) Screen.Home else Screen.DeviceRegistration) }
+    }
+
+    fun refreshRuntimeStatus(context: Context) {
+        val notificationAccessGranted = NotificationManagerCompat.getEnabledListenerPackages(context)
+            .contains(context.packageName)
+        val smsPermissionGranted = ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.READ_SMS
+        ) == PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.RECEIVE_SMS
+        ) == PackageManager.PERMISSION_GRANTED
+        val lastSyncedAt = sessionStore.getLastSyncedAt()
+        _uiState.update {
+            it.copy(
+                notificationAccessGranted = notificationAccessGranted,
+                smsPermissionGranted = smsPermissionGranted,
+                lastSyncedAt = lastSyncedAt.takeIf { ts -> ts > 0L }
+            )
+        }
     }
 
     fun checkSession() {
@@ -216,6 +248,9 @@ data class UiState(
     val deviceName: String = Build.MODEL,
     val registeredDeviceName: String? = null,
     val loadingMessage: String? = null,
+    val notificationAccessGranted: Boolean = false,
+    val smsPermissionGranted: Boolean = false,
+    val lastSyncedAt: Long? = null,
     val error: String? = null
 )
 
@@ -224,4 +259,5 @@ sealed class Screen {
     data object Auth : Screen()
     data object DeviceRegistration : Screen()
     data object Home : Screen()
+    data object AppWhitelist : Screen()
 }

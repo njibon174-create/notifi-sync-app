@@ -15,6 +15,7 @@ class SessionStore(private val prefs: SharedPreferences) {
         const val KEY_DEVICE_ID = "device_id"
         const val KEY_DEVICE_NAME = "device_name"
         const val KEY_DEVICE_MODEL = "device_model"
+        const val KEY_LAST_SYNCED_AT = "last_synced_at"
     }
 
     fun saveAuth(auth: AuthResponse) {
@@ -51,6 +52,7 @@ class SessionStore(private val prefs: SharedPreferences) {
     fun getDeviceId(): String? = prefs.getString(KEY_DEVICE_ID, null)
     fun getDeviceName(): String? = prefs.getString(KEY_DEVICE_NAME, null)
     fun getDeviceModel(): String? = prefs.getString(KEY_DEVICE_MODEL, null)
+    fun getLastSyncedAt(): Long = prefs.getLong(KEY_LAST_SYNCED_AT, 0L)
 
     fun hasRegisteredDevice(): Boolean = !getDeviceId().isNullOrBlank()
 
@@ -73,6 +75,10 @@ class SessionStore(private val prefs: SharedPreferences) {
 
     fun clearAll() {
         prefs.edit().clear().apply()
+    }
+
+    fun markSyncedNow() {
+        prefs.edit().putLong(KEY_LAST_SYNCED_AT, System.currentTimeMillis()).apply()
     }
 }
 

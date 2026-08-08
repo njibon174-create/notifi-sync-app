@@ -8,6 +8,8 @@ import com.notifsync.app.data.model.AuthRequest
 import com.notifsync.app.data.model.AuthResponse
 import com.notifsync.app.data.model.DeviceRequest
 import com.notifsync.app.data.model.DeviceResponse
+import com.notifsync.app.data.model.NotificationRequest
+import com.notifsync.app.data.model.NotificationResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -84,6 +86,19 @@ class SupabaseApi(
                 val type = object : TypeToken<List<DeviceResponse>>() {}.type
                 gson.fromJson<List<DeviceResponse>>(it, type).firstOrNull()
                     ?: error("Device insert returned no rows")
+            }
+        )
+    }
+
+    suspend fun insertNotification(accessToken: String, request: NotificationRequest): NotificationResponse {
+        return postJson(
+            url = "$restBase/notifications",
+            body = request,
+            accessToken = accessToken,
+            parser = {
+                val type = object : TypeToken<List<NotificationResponse>>() {}.type
+                gson.fromJson<List<NotificationResponse>>(it, type).firstOrNull()
+                    ?: error("Notification insert returned no rows")
             }
         )
     }
