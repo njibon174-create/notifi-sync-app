@@ -8,6 +8,8 @@ import com.notifsync.app.data.model.AuthRequest
 import com.notifsync.app.data.model.AuthResponse
 import com.notifsync.app.data.model.DeviceRequest
 import com.notifsync.app.data.model.DeviceResponse
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -86,13 +88,13 @@ class SupabaseApi(
         )
     }
 
-    private inline fun <T> postJson(
+    private suspend inline fun <T> postJson(
         url: String,
         body: Any,
         accessToken: String? = null,
         includeAuth: Boolean = true,
         crossinline parser: (String) -> T
-    ): T {
+    ): T = withContext(Dispatchers.IO) {
         val json = gson.toJson(body)
         val requestBody = json.toRequestBody(jsonMediaType)
         val reqBuilder = Request.Builder().url(url)
@@ -112,7 +114,7 @@ class SupabaseApi(
             Log.e("SupabaseApi", "HTTP ${response.code} for $url: ${bodyString.take(500)}")
             throw SupabaseException(parseError(bodyString))
         }
-        return parser(bodyString)
+        parser(bodyString)
     }
 
     private fun parseError(body: String): String {
