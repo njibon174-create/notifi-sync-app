@@ -73,50 +73,64 @@ fun AppWhitelistScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(apps, key = { it.packageName }) { app ->
-                val checked = selectedPackages.contains(app.packageName)
-                Card(
-                    modifier = Modifier.fillMaxWidth().clickable {
-                        val next = if (checked) selectedPackages - app.packageName else selectedPackages + app.packageName
-                        selectedPackages = next
-                        coroutineScope.launch {
-                            whitelistStore.saveWhitelistedPackages(next)
-                        }
-                    },
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
+        if (apps.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text("No launchable apps found yet.")
+                Text(
+                    "If this persists, confirm the package visibility queries are present and reinstall the app.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(apps, key = { it.packageName }) { app ->
+                    val checked = selectedPackages.contains(app.packageName)
+                    Card(
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            val next = if (checked) selectedPackages - app.packageName else selectedPackages + app.packageName
+                            selectedPackages = next
+                            coroutineScope.launch {
+                                whitelistStore.saveWhitelistedPackages(next)
+                            }
+                        },
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                     ) {
-                        Image(
-                            bitmap = app.icon.toBitmap(96, 96).asImageBitmap(),
-                            contentDescription = app.appName,
-                            modifier = Modifier.padding(end = 12.dp)
-                        )
-                        Column(modifier = Modifier.padding(end = 12.dp)) {
-                            Text(app.appName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(
-                                app.packageName,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Image(
+                                bitmap = app.icon.toBitmap(96, 96).asImageBitmap(),
+                                contentDescription = app.appName,
+                                modifier = Modifier.padding(end = 12.dp)
+                            )
+                            Column(modifier = Modifier.padding(end = 12.dp)) {
+                                Text(app.appName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    app.packageName,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Checkbox(
+                                checked = checked,
+                                onCheckedChange = { newChecked ->
+                                    val next = if (newChecked) selectedPackages + app.packageName else selectedPackages - app.packageName
+                                    selectedPackages = next
+                                    coroutineScope.launch {
+                                        whitelistStore.saveWhitelistedPackages(next)
+                                    }
+                                }
                             )
                         }
-                        Checkbox(
-                            checked = checked,
-                            onCheckedChange = { newChecked ->
-                                val next = if (newChecked) selectedPackages + app.packageName else selectedPackages - app.packageName
-                                selectedPackages = next
-                                coroutineScope.launch {
-                                    whitelistStore.saveWhitelistedPackages(next)
-                                }
-                            }
-                        )
                     }
                 }
             }
