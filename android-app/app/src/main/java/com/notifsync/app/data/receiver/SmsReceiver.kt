@@ -38,7 +38,7 @@ class SmsReceiver : BroadcastReceiver() {
                     body = body,
                     originalTimestamp = Instant.ofEpochMilli(timestamp).toString()
                 )
-                application(context).uploader.uploadOrQueue(request)
+                application(context).container.uploader.uploadOrQueue(request)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to process incoming SMS", e)
             } finally {

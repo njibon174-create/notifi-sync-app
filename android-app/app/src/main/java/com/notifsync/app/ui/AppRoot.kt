@@ -12,10 +12,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.notifsync.app.AppViewModel
 import com.notifsync.app.Screen
 import com.notifsync.app.ui.apps.AppWhitelistScreen
-import com.notifsync.app.ui.auth.AuthScreen
-import com.notifsync.app.ui.device.DeviceSetupScreen
+import com.notifsync.app.ui.common.LoadingOverlay
+import com.notifsync.app.ui.device.DeviceScreen
 import com.notifsync.app.ui.home.HomeScreen
-import com.notifsync.app.ui.loading.LoadingScreen
+import com.notifsync.app.ui.login.LoginScreen
 
 @Composable
 fun AppRoot(appViewModel: AppViewModel) {
@@ -40,19 +40,19 @@ fun AppRoot(appViewModel: AppViewModel) {
     }
 
     when (state.screen) {
-        Screen.Loading -> LoadingScreen(message = state.loadingMessage)
-        Screen.Auth -> AuthScreen(
+        Screen.Loading -> LoadingOverlay(message = state.loadingMessage ?: "Loading...")
+        Screen.Auth -> LoginScreen(
             state = state,
             onEmailChange = appViewModel::updateEmail,
             onPasswordChange = appViewModel::updatePassword,
             onSubmit = appViewModel::submitAuth,
-            onToggleMode = appViewModel::toggleMode
+            onToggleMode = appViewModel::toggleAuthMode,
+            onContinue = appViewModel::checkSession
         )
-        Screen.DeviceRegistration -> DeviceSetupScreen(
+        Screen.DeviceRegistration -> DeviceScreen(
             state = state,
             onDeviceNameChange = appViewModel::updateDeviceName,
-            onSubmit = appViewModel::registerDevice,
-            onBackToLogin = appViewModel::logout
+            onSubmit = appViewModel::submitDeviceRegistration
         )
         Screen.Home -> HomeScreen(
             state = state,

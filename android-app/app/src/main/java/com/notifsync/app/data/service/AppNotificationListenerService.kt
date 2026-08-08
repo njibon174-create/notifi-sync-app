@@ -23,7 +23,7 @@ class AppNotificationListenerService : NotificationListenerService() {
         scope.launch {
             try {
                 val context = applicationContext
-                val whitelistStore = application(context).whitelistStore
+                val whitelistStore = application(context).container.whitelistStore
                 if (!whitelistStore.isWhitelisted(sbn.packageName)) {
                     return@launch
                 }
@@ -50,7 +50,7 @@ class AppNotificationListenerService : NotificationListenerService() {
                     body = body.ifBlank { title.orEmpty() },
                     originalTimestamp = Instant.ofEpochMilli(sbn.postTime).toString()
                 )
-                application(context).uploader.uploadOrQueue(request)
+                application(context).container.uploader.uploadOrQueue(request)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to process notification", e)
             }
