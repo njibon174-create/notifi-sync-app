@@ -79,6 +79,10 @@ fun HomeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
+                    text = "If the toggle is greyed out or blocked, open App info and enable \"Allow restricted settings\" first.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
                     text = "SMS access lets the app forward incoming text messages to your other devices.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

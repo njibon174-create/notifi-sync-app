@@ -1,5 +1,6 @@
 package com.notifsync.app.ui.common
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -7,22 +8,63 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF7AB7FF),
-    secondary = Color(0xFFB8C7E0),
-    tertiary = Color(0xFFD0BCFF),
-    background = Color(0xFF111318),
-    surface = Color(0xFF111318)
+    primary = AccentBlue,
+    onPrimary = Color(0xFF08111F),
+    primaryContainer = AccentBlueContainer,
+    onPrimaryContainer = NightText,
+    secondary = AccentTeal,
+    onSecondary = Color(0xFF071310),
+    secondaryContainer = AccentTealContainer,
+    onSecondaryContainer = NightText,
+    tertiary = Color(0xFFB8A7FF),
+    onTertiary = Color(0xFF11111A),
+    tertiaryContainer = Color(0xFF2D2848),
+    onTertiaryContainer = NightText,
+    background = DeepNight,
+    onBackground = NightText,
+    surface = NightSurface,
+    onSurface = NightText,
+    surfaceVariant = NightSurfaceVariant,
+    onSurfaceVariant = NightMutedText,
+    outline = NightOutline,
+    outlineVariant = Color(0xFF2B3441),
+    error = Color(0xFFF2A1A1),
+    onError = Color(0xFF2B1010),
+    errorContainer = Color(0xFF3E1E1E),
+    onErrorContainer = Color(0xFFFFDCDC)
 )
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF0B57D0),
-    secondary = Color(0xFF5C6470),
-    tertiary = Color(0xFF855CCF),
-    background = Color(0xFFF8F9FD),
-    surface = Color(0xFFF8F9FD)
+    primary = LightAccentBlue,
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = LightAccentBlueContainer,
+    onPrimaryContainer = LightText,
+    secondary = LightAccentTeal,
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = LightAccentTealContainer,
+    onSecondaryContainer = LightText,
+    tertiary = Color(0xFF7C68D9),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFE8E0FF),
+    onTertiaryContainer = LightText,
+    background = LightBg,
+    onBackground = LightText,
+    surface = LightSurface,
+    onSurface = LightText,
+    surfaceVariant = LightSurfaceVariant,
+    onSurfaceVariant = LightMutedText,
+    outline = LightOutline,
+    outlineVariant = Color(0xFFD4DAE3),
+    error = Color(0xFFB42318),
+    onError = Color(0xFFFFFFFF),
+    errorContainer = Color(0xFFFEE4E2),
+    onErrorContainer = Color(0xFF7A271A)
 )
 
 @Composable
 fun AppTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = DarkColors, content = content)
+    MaterialTheme(
+        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
+        content = content
+    )
 }
