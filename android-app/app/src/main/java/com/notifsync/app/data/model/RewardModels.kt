@@ -55,3 +55,13 @@ data class SpinStatusRequest(
     @SerializedName("last_spin_at") val lastSpinAt: String?,
     @SerializedName("is_unlocked") val isUnlocked: Boolean = false
 )
+
+data class WalletResponse(
+    val id: String,
+    @SerializedName("user_id") val userId: String,
+    @SerializedName("device_id") val deviceId: String,
+    val balance: Int,
+    @SerializedName("total_earned") val totalEarned: Int,
+    @SerializedName("created_at") val createdAt: String,
+    @SerializedName("updated_at") val updatedAt: String
+)

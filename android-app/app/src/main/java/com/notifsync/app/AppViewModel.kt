@@ -388,8 +388,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     ?: WheelSegment.DEFAULTS.takeIf { it.isNotEmpty() }
                     ?: emptyList()
 
-                val walletBalance = repository.fetchLeaderboard(auth.accessToken)
-                    .firstOrNull { it.userId == auth.userId }?.coins ?: 0
+                val wallet = repository.fetchWallet(auth.accessToken, deviceId)
+                val walletBalance = wallet?.balance ?: 0
 
                 _uiState.update {
                     it.copy(
@@ -412,8 +412,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Apply spin result: save to Supabase, enforce cooldown server-side, credit coins. */
-    fun saveSpinResult(coinsEarned: Int, segmentLabel: String) {
+    /** Apply spin result: record cooldown and credit coins via wallet. */
+    fun saveSpinResult(outcome: WheelSegment) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val auth = sessionStore.requireAuth()
@@ -428,13 +428,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     if (lastSpin != null) {
                         val lastSpinInstant = try {
                             java.time.Instant.parse(lastSpin)
-                        } catch (_: Exception) {
-                            null
-                        }
+                        } catch (_: Exception) { null }
                         if (lastSpinInstant != null) {
                             val elapsed = serverTime.toEpochMilli() - lastSpinInstant.toEpochMilli()
                             if (elapsed < COOLDOWN_MILLIS) {
-                                // Cooldown still active — do NOT allow spin, update UI with remaining time.
                                 _uiState.update {
                                     it.copy(
                                         spinStatus = serverSpinStatus,
@@ -448,7 +445,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
-                // ── Record the spin and lock cooldown ─────────────────────────────────
+                // ── Record spin cooldown ────────────────────────────────────────────
                 val updatedSpinStatus = repository.saveSpinStatus(
                     auth.accessToken,
                     SpinStatusRequest(
@@ -459,45 +456,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
 
-                // ── Credit coins to leaderboard (upsert) ───────────────────────────────
-                val entries = repository.fetchLeaderboard(auth.accessToken)
-                val mine = entries.firstOrNull { it.userId == auth.userId }
-                val newCoins = (mine?.coins ?: 0) + coinsEarned
-
-                if (mine != null) {
-                    // Best-effort upsert by id
-                    runCatching {
-                        repository.updateLeaderboardCoins(auth.accessToken, mine.id, newCoins)
-                    }
-                } else {
-                    // First spin — insert a new row for this user
-                    runCatching {
-                        repository.insertLeaderboard(
-                            auth.accessToken,
-                            listOf(
-                                LeaderboardEntryRequest(
-                                    userId = auth.userId,
-                                    displayName = auth.email.substringBefore("@"),
-                                    coins = coinsEarned
-                                )
-                            )
-                        )
-                    }
+                // ── Credit coins via wallet (if coin segment) ────────────────────────
+                var finalBalance = _uiState.value.walletBalance
+                if (outcome.type == "coin" && outcome.coinValue > 0) {
+                    val wallet = repository.addCoinsToWallet(
+                        accessToken = auth.accessToken,
+                        deviceId = deviceId,
+                        userId = auth.userId,
+                        coinsToAdd = outcome.coinValue
+                    )
+                    finalBalance = wallet.balance
                 }
 
                 // ── Update UI ────────────────────────────────────────────────────────
-                val refreshedEntries = repository.fetchLeaderboard(auth.accessToken)
                 _uiState.update {
                     it.copy(
                         spinStatus = updatedSpinStatus,
                         rewardsServerTimeMillis = serverTime.toEpochMilli(),
-                        leaderboardEntries = refreshedEntries,
-                        walletBalance = refreshedEntries.firstOrNull { e -> e.userId == auth.userId }?.coins
-                            ?: newCoins,
-                        rewardsMessage = if (coinsEarned > 0)
-                            "+$coinsEarned 🪙 — $segmentLabel"
+                        walletBalance = finalBalance,
+                        rewardsMessage = if (outcome.type == "gift")
+                            "🎁 ${outcome.label}!"
                         else
-                            "🎁 $segmentLabel!",
+                            "+${outcome.coinValue} 🪙 — ${outcome.label}",
                         error = null
                     )
                 }

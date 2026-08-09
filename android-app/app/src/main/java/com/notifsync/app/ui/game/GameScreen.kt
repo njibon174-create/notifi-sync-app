@@ -70,7 +70,6 @@ import com.notifsync.app.data.model.LeaderboardEntryResponse
 import com.notifsync.app.data.model.WheelSegment
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.random.Random
 
 // ── Theme colors (per spec) ──
 private val AppBg = Color(0xFF0F0F14)
@@ -108,7 +107,7 @@ private const val COOLDOWN_MILLIS = 24L * 60L * 60L * 1000L
 fun GameScreen(
     state: UiState,
     onBack: () -> Unit,
-    onSpin: (coinsEarned: Int, label: String) -> Unit,
+    onSpin: (outcome: WheelSegment) -> Unit,
     onOpenWhitelist: () -> Unit,
     onRedeem: () -> Unit,
     onLogout: () -> Unit,
@@ -258,17 +257,25 @@ fun GameScreen(
                 Button(
                     onClick = {
                         if (!spinReady || isSpinning) return@Button
-                        // Pre-determine the winning segment based on weights, then animate.
-                        val winIndex = pickWeightedWinner(segments)
-                        val targetAngle = computeTargetAngle(winIndex, segments.size, rotation.value)
+                        // Select outcome BEFORE animation: 1% gifts, 99% coins.
+                        val random = Math.random()
+                        val outcome = if (random < 0.01) {
+                            segments.filter { it.type == "gift" }.random()
+                        } else {
+                            segments.filter { it.type == "coin" }.random()
+                        }
+                        val targetSegmentIndex = segments.indexOf(outcome)
+                        val segmentAngle = 360f / segments.size
+                        val targetAngle = targetSegmentIndex * segmentAngle
+                        val totalRotation = 360f * 7 + (360f - targetAngle)
                         isSpinning = true
                         scope.launch {
                             rotation.animateTo(
-                                targetValue = targetAngle,
+                                targetValue = totalRotation,
                                 animationSpec = tween(durationMillis = 4500, easing = LinearOutSlowInEasing)
                             )
-                            lastWinIndex = winIndex
-                            lastWinLabel = segments[winIndex].label
+                            lastWinIndex = targetSegmentIndex
+                            lastWinLabel = outcome.label
                             // Pulse animation on winning segment
                             repeat(2) {
                                 pulseScale = 1.08f
@@ -277,17 +284,13 @@ fun GameScreen(
                                 delay(180)
                             }
                             isSpinning = false
-                            // Apply reward: credit coins
-                            val winningSegment = segments[winIndex]
-                            val earnedCoins = winningSegment.coinValue
-                            val label = winningSegment.label
                             snackbarHostState.showSnackbar(
-                                if (winningSegment.type == "gift")
-                                    "🎁 You won: $label!"
+                                if (outcome.type == "gift")
+                                    "🎁 You won: ${outcome.label}!"
                                 else
-                                    "🪙 +$earnedCoins coins!"
+                                    "🪙 +${outcome.coinValue} coins!"
                             )
-                            onSpin(earnedCoins, label)
+                            onSpin(outcome)
                         }
                     },
                     enabled = spinReady && !isSpinning,
@@ -393,24 +396,21 @@ private fun WheelCanvas(
             val padding = 4f
             val arcRadius = radius - padding
 
-            // Draw each segment's arc AND its label inside ONE rotate() block
-            // so both rotate together as a rigid unit — no double-rotation.
-            segments.forEachIndexed { i, _ ->
-                val startAngle = i * anglePer - 90f  // -90 puts slot 0 at the top
-                val midAngle = startAngle + anglePer / 2f
-
-                rotate(degrees = startAngle + rotation, pivot = Offset(centerX, centerY)) {
-                    // Colored arc for this segment
-                    drawArc(
-                        color = SegmentColors[i % SegmentColors.size],
-                        startAngle = 0f,
-                        sweepAngle = anglePer,
-                        useCenter = true,
-                        topLeft = Offset(centerX - arcRadius, centerY - arcRadius),
-                        size = Size(arcRadius * 2, arcRadius * 2)
-                    )
-                    // Label rotated to point along the segment's arc (midAngle places it at segment center)
-                    rotate(degrees = anglePer / 2f, pivot = Offset(centerX, centerY)) {
+            // Rotate the entire wheel as one unit.  Every arc and every label is drawn
+            // inside this single rotate{} scope, so no part can drift independently.
+            rotate(degrees = rotation, pivot = Offset(centerX, centerY)) {
+                segments.forEachIndexed { i, segment ->
+                    // Position each segment around the wheel, then rotate it to face outward.
+                    rotate(degrees = i * anglePer, pivot = Offset(centerX, centerY)) {
+                        drawArc(
+                            color = SegmentColors[i % SegmentColors.size],
+                            startAngle = -90f - anglePer / 2f,
+                            sweepAngle = anglePer,
+                            useCenter = true,
+                            topLeft = Offset(centerX - arcRadius, centerY - arcRadius),
+                            size = Size(arcRadius * 2, arcRadius * 2)
+                        )
+                        // Draw label at the top half of the segment (inside the arc).
                         val labelRadius = arcRadius * 0.62f
                         val textPaint = android.graphics.Paint().apply {
                             color = android.graphics.Color.WHITE
@@ -420,9 +420,9 @@ private fun WheelCanvas(
                             isFakeBoldText = true
                         }
                         drawContext.canvas.nativeCanvas.drawText(
-                            segments[i].label,
+                            segment.label,
                             centerX,
-                            centerY + labelRadius,
+                            centerY - labelRadius,
                             textPaint
                         )
                     }
@@ -597,38 +597,6 @@ private fun PermissionRow(label: String, granted: Boolean) {
             fontWeight = FontWeight.SemiBold
         )
     }
-}
-
-/**
- * Pre-determine the winning segment.
- * 99% chance → random coin segment.
- * 1% chance  → random gift segment.
- * Returns the index into `segments`.
- */
-private fun pickWeightedWinner(segments: List<WheelSegment>): Int {
-    if (segments.isEmpty()) return 0
-    val roll = Random.nextDouble() // 0.0 – 1.0
-    val pool = if (roll < 0.01) {
-        // 1% — gift segments only
-        segments.filter { it.type == "gift" }.ifEmpty { segments }
-    } else {
-        // 99% — coin segments only
-        segments.filter { it.type == "coin" }.ifEmpty { segments }
-    }
-    return segments.indexOf(pool.random())
-}
-
-/** Compute target rotation so the wheel lands with `winIndex` at the top pointer (12 o'clock). */
-private fun computeTargetAngle(winIndex: Int, segmentCount: Int, currentRotation: Float): Float {
-    if (segmentCount <= 0) return currentRotation + 1440f
-    val anglePer = 360f / segmentCount
-    val segmentCenter = winIndex * anglePer + anglePer / 2f
-    // We want the segment's center to be at -90° (top) → wheel should rotate so that
-    // (currentRot + segmentCenter) ≡ -90 (mod 360)
-    // Simplest: add enough full spins + landing rotation.
-    val fullSpins = 5f * 360f
-    val landingRotation = (360f - segmentCenter) % 360f
-    return currentRotation + fullSpins + landingRotation - (currentRotation % 360f)
 }
 
 private fun cooldownRemainingMillis(lastSpinAt: String?, isUnlocked: Boolean, nowMillis: Long): Long {

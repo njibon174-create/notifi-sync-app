@@ -78,7 +78,7 @@ fun AppRoot(appViewModel: AppViewModel) {
         Screen.Game -> GameScreen(
             state = state,
             onBack = appViewModel::showHome,
-            onSpin = { coinsEarned, label -> appViewModel.saveSpinResult(coinsEarned, label) },
+            onSpin = appViewModel::saveSpinResult,
             onOpenWhitelist = appViewModel::openAppWhitelist,
             onRedeem = appViewModel::openRedeem,
             onLogout = appViewModel::logout,

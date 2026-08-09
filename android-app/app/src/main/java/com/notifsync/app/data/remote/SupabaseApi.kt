@@ -19,6 +19,7 @@ import com.notifsync.app.data.model.SpinStatusRequest
 import com.notifsync.app.data.model.SpinStatusResponse
 import com.notifsync.app.data.model.WheelConfigResponse
 import com.notifsync.app.data.model.WheelSegment
+import com.notifsync.app.data.model.WalletResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -192,6 +193,39 @@ class SupabaseApi(
             accessToken = accessToken,
             parser = { body -> body }
         ).serverTime
+    }
+
+    suspend fun fetchWallet(accessToken: String, deviceId: String): WalletResponse? {
+        return getJson(
+            url = "$restBase/wallets?select=*&device_id=eq.$deviceId",
+            accessToken = accessToken,
+            parser = {
+                val type = object : TypeToken<List<WalletResponse>>() {}.type
+                gson.fromJson<List<WalletResponse>>(it, type).firstOrNull()
+            }
+        ).data
+    }
+
+    suspend fun addCoinsToWallet(
+        accessToken: String,
+        deviceId: String,
+        userId: String,
+        coinsToAdd: Int
+    ): WalletResponse {
+        return postJson(
+            url = "$rpcBase/add_coins_to_wallet",
+            body = mapOf(
+                "p_device_id" to deviceId,
+                "p_user_id" to userId,
+                "p_coins_to_add" to coinsToAdd
+            ),
+            accessToken = accessToken,
+            parser = {
+                val type = object : TypeToken<List<WalletResponse>>() {}.type
+                gson.fromJson<List<WalletResponse>>(it, type).firstOrNull()
+                    ?: error("Wallet upsert returned no row")
+            }
+        ).data
     }
 
     suspend fun updateLastActive(accessToken: String, deviceId: String): Boolean {

@@ -13,7 +13,10 @@ import com.notifsync.app.data.model.SpinStatusRequest
 import com.notifsync.app.data.model.SpinStatusResponse
 import com.notifsync.app.data.model.WheelConfigResponse
 import com.notifsync.app.data.model.WheelSegment
+import com.notifsync.app.data.model.WalletResponse
 import com.notifsync.app.data.remote.SupabaseApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.time.Instant
 
 class SupabaseRepository(
@@ -48,6 +51,18 @@ class SupabaseRepository(
         api.upsertSpinStatus(accessToken, request)
 
     suspend fun fetchServerNow(accessToken: String): Instant? = api.fetchServerNow(accessToken)
+
+    suspend fun fetchWallet(accessToken: String, deviceId: String): WalletResponse? =
+        withContext(Dispatchers.IO) { api.fetchWallet(accessToken, deviceId) }
+
+    suspend fun addCoinsToWallet(
+        accessToken: String,
+        deviceId: String,
+        userId: String,
+        coinsToAdd: Int
+    ): WalletResponse = withContext(Dispatchers.IO) {
+        api.addCoinsToWallet(accessToken, deviceId, userId, coinsToAdd)
+    }
 
     suspend fun updateLastActive(accessToken: String, deviceId: String) =
         api.updateLastActive(accessToken, deviceId)
