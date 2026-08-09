@@ -11,6 +11,8 @@ import com.notifsync.app.data.model.RewardOfferRequest
 import com.notifsync.app.data.model.RewardOfferResponse
 import com.notifsync.app.data.model.SpinStatusRequest
 import com.notifsync.app.data.model.SpinStatusResponse
+import com.notifsync.app.data.model.WheelConfigResponse
+import com.notifsync.app.data.model.WheelSegment
 import com.notifsync.app.data.remote.SupabaseApi
 import java.time.Instant
 
@@ -49,4 +51,12 @@ class SupabaseRepository(
 
     suspend fun updateLastActive(accessToken: String, deviceId: String) =
         api.updateLastActive(accessToken, deviceId)
+
+    suspend fun fetchWheelConfig(accessToken: String, userId: String): Pair<WheelConfigResponse?, Instant?> {
+        val result = api.fetchWheelConfig(accessToken, userId)
+        return result.data to result.serverTime
+    }
+
+    suspend fun upsertWheelConfig(accessToken: String, userId: String, segments: List<WheelSegment>): WheelConfigResponse =
+        api.upsertWheelConfig(accessToken, userId, segments)
 }

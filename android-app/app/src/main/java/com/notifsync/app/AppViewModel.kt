@@ -383,8 +383,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     serverTime = refreshed.second
                 }
 
-                val wheelResult = repository.fetchWheelConfig(auth.accessToken, auth.userId)
-                val wheelSegments = wheelResult.data?.segments
+                val (wheelConfig, _) = repository.fetchWheelConfig(auth.accessToken, auth.userId)
+                val wheelSegments = wheelConfig?.segments
                     ?: WheelSegment.DEFAULTS.takeIf { it.isNotEmpty() }
                     ?: emptyList()
 
