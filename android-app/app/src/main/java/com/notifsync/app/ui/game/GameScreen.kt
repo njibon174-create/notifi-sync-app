@@ -135,7 +135,7 @@ fun GameScreen(
         spinStatus?.lastSpinAt == null || remainingMillis <= 0
 
     val segments = if (state.wheelSegments.isNotEmpty()) state.wheelSegments else DefaultSegments
-    val currentCoins = state.leaderboardEntries.firstOrNull { it.userId == state.currentUserId }?.coins ?: 0
+    val currentCoins = state.walletBalance
 
     var sheetVisible by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -392,42 +392,44 @@ private fun WheelCanvas(
             val centerY = size.height / 2f
             val padding = 4f
             val arcRadius = radius - padding
-            // Draw each segment
-            segments.forEachIndexed { i, segment ->
-                val startAngle = i * anglePer - 90f + rotation  // -90 to start at top
-                rotate(degrees = rotation, pivot = Offset(centerX, centerY)) {
+
+            // Draw each segment's arc AND its label inside ONE rotate() block
+            // so both rotate together as a rigid unit — no double-rotation.
+            segments.forEachIndexed { i, _ ->
+                val startAngle = i * anglePer - 90f  // -90 puts slot 0 at the top
+                val midAngle = startAngle + anglePer / 2f
+
+                rotate(degrees = startAngle + rotation, pivot = Offset(centerX, centerY)) {
+                    // Colored arc for this segment
                     drawArc(
                         color = SegmentColors[i % SegmentColors.size],
-                        startAngle = startAngle,
+                        startAngle = 0f,
                         sweepAngle = anglePer,
                         useCenter = true,
                         topLeft = Offset(centerX - arcRadius, centerY - arcRadius),
                         size = Size(arcRadius * 2, arcRadius * 2)
                     )
-                }
-            }
-            // Segment labels (rotated to follow arc)
-            segments.forEachIndexed { i, segment ->
-                val midAngle = i * anglePer + anglePer / 2f - 90f
-                rotate(degrees = midAngle + rotation, pivot = Offset(centerX, centerY)) {
-                    val labelRadius = arcRadius * 0.62f
-                    val text = segment.label
-                    val paint = android.graphics.Paint().apply {
-                        color = android.graphics.Color.WHITE
-                        textSize = (radius * 0.10f).coerceAtLeast(18f)
-                        textAlign = android.graphics.Paint.Align.CENTER
-                        isAntiAlias = true
-                        isFakeBoldText = true
+                    // Label rotated to point along the segment's arc (midAngle places it at segment center)
+                    rotate(degrees = anglePer / 2f, pivot = Offset(centerX, centerY)) {
+                        val labelRadius = arcRadius * 0.62f
+                        val textPaint = android.graphics.Paint().apply {
+                            color = android.graphics.Color.WHITE
+                            textSize = (radius * 0.10f).coerceAtLeast(18f)
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            isAntiAlias = true
+                            isFakeBoldText = true
+                        }
+                        drawContext.canvas.nativeCanvas.drawText(
+                            segments[i].label,
+                            centerX,
+                            centerY + labelRadius,
+                            textPaint
+                        )
                     }
-                    drawContext.canvas.nativeCanvas.drawText(
-                        text,
-                        centerX,
-                        centerY + labelRadius,
-                        paint
-                    )
                 }
             }
-            // Center hub circle
+
+            // Center hub circles (drawn in world space, not rotated)
             drawCircle(
                 color = Color(0xFF1A1A24),
                 radius = radius * 0.18f,
@@ -597,20 +599,23 @@ private fun PermissionRow(label: String, granted: Boolean) {
     }
 }
 
-/** Weighted random — segments with higher coin value have lower probability. */
+/**
+ * Pre-determine the winning segment.
+ * 99% chance → random coin segment.
+ * 1% chance  → random gift segment.
+ * Returns the index into `segments`.
+ */
 private fun pickWeightedWinner(segments: List<WheelSegment>): Int {
     if (segments.isEmpty()) return 0
-    val weights = segments.map { seg ->
-        // Gifts get a moderate weight, coin segments: weight = 10 / (1 + coinValue)
-        if (seg.type == "gift") 1.5 else (10.0 / (1.0 + seg.coinValue))
+    val roll = Random.nextDouble() // 0.0 – 1.0
+    val pool = if (roll < 0.01) {
+        // 1% — gift segments only
+        segments.filter { it.type == "gift" }.ifEmpty { segments }
+    } else {
+        // 99% — coin segments only
+        segments.filter { it.type == "coin" }.ifEmpty { segments }
     }
-    val total = weights.sum()
-    var roll = Random.nextDouble() * total
-    for (i in weights.indices) {
-        roll -= weights[i]
-        if (roll <= 0.0) return i
-    }
-    return segments.lastIndex
+    return segments.indexOf(pool.random())
 }
 
 /** Compute target rotation so the wheel lands with `winIndex` at the top pointer (12 o'clock). */

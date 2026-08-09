@@ -11,7 +11,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.notifsync.app.data.SupabaseRepository
 import com.notifsync.app.data.model.LeaderboardEntryRequest
-import com.notifsync.app.data.model.LeaderboardEntryResponse
 import com.notifsync.app.data.model.RewardOfferRequest
 import com.notifsync.app.data.model.RewardOfferResponse
 import com.notifsync.app.data.model.SpinStatusRequest
@@ -143,11 +142,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             error = null
                         )
                     }
-                    setScreen(if (sessionStore.hasRegisteredDevice()) Screen.Home else Screen.DeviceRegistration)
+                    setScreen(if (sessionStore.hasRegisteredDevice()) Screen.Game else Screen.DeviceRegistration)
                     return@launch
                 }
 
-                if (!refreshToken.isNullOrBlank()) {
+                if (!refreshToken.isBlank()) {
                     val refreshed = repository.refreshSession(refreshToken)
                     sessionStore.saveAuth(refreshed)
                     val deviceName = sessionStore.getDeviceName()
@@ -159,7 +158,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             error = null
                         )
                     }
-                    setScreen(if (sessionStore.hasRegisteredDevice()) Screen.Home else Screen.DeviceRegistration)
+                    setScreen(if (sessionStore.hasRegisteredDevice()) Screen.Game else Screen.DeviceRegistration)
                     return@launch
                 }
 
@@ -212,7 +211,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         isSignUp = false
                     )
                 }
-                setScreen(if (sessionStore.hasRegisteredDevice()) Screen.Home else Screen.DeviceRegistration)
+                setScreen(if (sessionStore.hasRegisteredDevice()) Screen.Game else Screen.DeviceRegistration)
             } catch (e: Exception) {
                 Log.e("AuthFlow", "Auth submit failed", e)
                 clearToAuth(error = mapError(e))
@@ -252,7 +251,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         isUnlocked = false
                     )
                 )
-                setScreen(Screen.Home)
+                setScreen(Screen.Game)
             } catch (e: Exception) {
                 Log.e("AuthFlow", "Device registration failed", e)
                 clearToAuth(error = mapError(e))
@@ -388,6 +387,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     ?: WheelSegment.DEFAULTS.takeIf { it.isNotEmpty() }
                     ?: emptyList()
 
+                val walletBalance = repository.fetchLeaderboard(auth.accessToken)
+                    .firstOrNull { it.userId == auth.userId }?.coins ?: 0
+
                 _uiState.update {
                     it.copy(
                         leaderboardEntries = leaderboard,
@@ -395,6 +397,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         rewardsServerTimeMillis = serverTime?.toEpochMilli(),
                         wheelSegments = wheelSegments,
                         currentUserId = auth.userId,
+                        walletBalance = walletBalance,
                         loadingMessage = null,
                         error = null
                     )
@@ -408,59 +411,93 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Apply spin reward — credit coin value to current user's leaderboard row. */
+    /** Apply spin result: save to Supabase, enforce cooldown server-side, credit coins. */
     fun saveSpinResult(coinsEarned: Int, segmentLabel: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val auth = sessionStore.requireAuth()
                 val deviceId = sessionStore.getDeviceId() ?: error("Device not registered")
-                val serverNow = repository.fetchServerNow(auth.accessToken) ?: Instant.now()
-                val updated = repository.saveSpinStatus(
+
+                // ── Server-side cooldown enforcement ─────────────────────────────────
+                val (serverSpinStatus, serverNow) = repository.fetchSpinStatus(auth.accessToken, deviceId)
+                val serverTime = serverNow ?: Instant.now()
+
+                if (serverSpinStatus != null && !serverSpinStatus.isUnlocked) {
+                    val lastSpin = serverSpinStatus.lastSpinAt
+                    if (lastSpin != null) {
+                        val lastSpinInstant = try {
+                            java.time.Instant.parse(lastSpin)
+                        } catch (_: Exception) {
+                            null
+                        }
+                        if (lastSpinInstant != null) {
+                            val elapsed = serverTime.toEpochMilli() - lastSpinInstant.toEpochMilli()
+                            if (elapsed < COOLDOWN_MILLIS) {
+                                // Cooldown still active — do NOT allow spin, update UI with remaining time.
+                                _uiState.update {
+                                    it.copy(
+                                        spinStatus = serverSpinStatus,
+                                        rewardsServerTimeMillis = serverTime.toEpochMilli(),
+                                        error = null
+                                    )
+                                }
+                                return@launch
+                            }
+                        }
+                    }
+                }
+
+                // ── Record the spin and lock cooldown ─────────────────────────────────
+                val updatedSpinStatus = repository.saveSpinStatus(
                     auth.accessToken,
                     SpinStatusRequest(
                         userId = auth.userId,
                         deviceId = deviceId,
-                        lastSpinAt = serverNow.toString(),
+                        lastSpinAt = serverTime.toString(),
                         isUnlocked = false
                     )
                 )
 
-                // Credit coins by updating/inserting the current user's leaderboard entry
+                // ── Credit coins to leaderboard (upsert) ───────────────────────────────
                 val entries = repository.fetchLeaderboard(auth.accessToken)
                 val mine = entries.firstOrNull { it.userId == auth.userId }
                 val newCoins = (mine?.coins ?: 0) + coinsEarned
-                val newEntries = entries.map { e ->
-                    if (e.userId == auth.userId) e.copy(coins = newCoins) else e
-                }
-                if (mine == null) {
-                    repository.insertLeaderboard(
-                        auth.accessToken,
-                        listOf(
-                            LeaderboardEntryRequest(
-                                userId = auth.userId,
-                                displayName = auth.email.substringBefore("@"),
-                                coins = coinsEarned
-                            )
-                        )
-                    )
-                } else {
-                    // Upsert via PATCH by id (best-effort)
+
+                if (mine != null) {
+                    // Best-effort upsert by id
                     runCatching {
                         repository.updateLeaderboardCoins(auth.accessToken, mine.id, newCoins)
                     }
+                } else {
+                    // First spin — insert a new row for this user
+                    runCatching {
+                        repository.insertLeaderboard(
+                            auth.accessToken,
+                            listOf(
+                                LeaderboardEntryRequest(
+                                    userId = auth.userId,
+                                    displayName = auth.email.substringBefore("@"),
+                                    coins = coinsEarned
+                                )
+                            )
+                        )
+                    }
                 }
 
+                // ── Update UI ────────────────────────────────────────────────────────
+                val refreshedEntries = repository.fetchLeaderboard(auth.accessToken)
                 _uiState.update {
                     it.copy(
-                        spinStatus = updated,
-                        rewardsServerTimeMillis = serverNow.toEpochMilli(),
-                        leaderboardEntries = (if (mine == null) entries + LeaderboardEntryResponse(
-                            id = "self", userId = auth.userId,
-                            displayName = auth.email.substringBefore("@"),
-                            coins = coinsEarned, rank = null,
-                            createdAt = "", updatedAt = ""
-                        ) else newEntries),
-                        rewardsMessage = if (coinsEarned > 0) "+$coinsEarned 🪙 — $segmentLabel" else "🎁 ${segmentLabel}!"
+                        spinStatus = updatedSpinStatus,
+                        rewardsServerTimeMillis = serverTime.toEpochMilli(),
+                        leaderboardEntries = refreshedEntries,
+                        walletBalance = refreshedEntries.firstOrNull { e -> e.userId == auth.userId }?.coins
+                            ?: newCoins,
+                        rewardsMessage = if (coinsEarned > 0)
+                            "+$coinsEarned 🪙 — $segmentLabel"
+                        else
+                            "🎁 $segmentLabel!",
+                        error = null
                     )
                 }
             } catch (e: Exception) {
@@ -468,6 +505,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.update { it.copy(error = mapError(e)) }
             }
         }
+    }
+
+    private companion object {
+        private const val COOLDOWN_MILLIS = 24L * 60L * 60L * 1000L
     }
 
     fun logout() {
@@ -484,6 +525,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 rewardsMessage = null,
                 rewardsServerTimeMillis = null,
                 wheelSegments = emptyList(),
+                walletBalance = 0,
                 currentUserId = null,
                 isSignUp = false
             )
@@ -577,6 +619,7 @@ data class UiState(
     val rewardsServerTimeMillis: Long? = null,
     val rewardsMessage: String? = null,
     val wheelSegments: List<WheelSegment> = emptyList(),
+    val walletBalance: Int = 0,
     val currentUserId: String? = null,
     val error: String? = null
 )
