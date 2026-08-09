@@ -57,7 +57,7 @@ fun RewardsScreen(
     val spinStatus = state.spinStatus
     val serverNowMillis = state.rewardsServerTimeMillis ?: System.currentTimeMillis()
     val remainingInitial = remember(spinStatus, serverNowMillis) {
-        cooldownRemainingMillis(spinStatus?.last_spin_at, spinStatus?.is_unlocked ?: false, serverNowMillis)
+        cooldownRemainingMillis(spinStatus?.lastSpinAt, spinStatus?.isUnlocked ?: false, serverNowMillis)
     }
     var remainingMillis by remember(spinStatus, serverNowMillis) { mutableLongStateOf(remainingInitial) }
 
@@ -69,7 +69,7 @@ fun RewardsScreen(
         }
     }
 
-    val spinReady = spinStatus?.is_unlocked == true || spinStatus?.last_spin_at == null || remainingMillis <= 0
+    val spinReady = spinStatus?.isUnlocked == true || spinStatus?.lastSpinAt == null || remainingMillis <= 0
 
     Column(
         modifier = Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState()),

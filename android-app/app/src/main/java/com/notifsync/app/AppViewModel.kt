@@ -211,7 +211,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 repository.saveSpinStatus(
                     auth.accessToken,
                     SpinStatusRequest(
-                        userId = auth.user.id,
+                        userId = auth.userId,
                         deviceId = device.id,
                         lastSpinAt = null,
                         isUnlocked = false
@@ -237,7 +237,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (rewardOffers.isEmpty()) {
                     repository.insertRewardOffers(
                         auth.accessToken,
-                        defaultRewardOffers(auth.user.id)
+                        defaultRewardOffers(auth.userId)
                     )
                     rewardOffers = repository.fetchRewardOffers(auth.accessToken)
                 }
@@ -246,7 +246,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (leaderboard.isEmpty()) {
                     repository.insertLeaderboard(
                         auth.accessToken,
-                        defaultLeaderboard(auth.user.id)
+                        defaultLeaderboard(auth.userId)
                     )
                     leaderboard = repository.fetchLeaderboard(auth.accessToken)
                 }
@@ -256,7 +256,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     repository.saveSpinStatus(
                         auth.accessToken,
                         SpinStatusRequest(
-                            userId = auth.user.id,
+                            userId = auth.userId,
                             deviceId = deviceId,
                             lastSpinAt = null,
                             isUnlocked = false
@@ -299,7 +299,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val updated = repository.saveSpinStatus(
                     auth.accessToken,
                     SpinStatusRequest(
-                        userId = auth.user.id,
+                        userId = auth.userId,
                         deviceId = deviceId,
                         lastSpinAt = serverNow.toString(),
                         isUnlocked = false
