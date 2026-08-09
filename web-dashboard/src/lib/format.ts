@@ -20,6 +20,32 @@ export function formatTimestamp(value: string): string {
   }).format(date)
 }
 
+export type RelativeStatus = {
+  label: string
+  isOnline: boolean
+}
+
+export function getRelativeStatus(value: string | null): RelativeStatus {
+  if (!value) return { label: 'Never', isOnline: false }
+  const date = new Date(value)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffSeconds = Math.max(0, Math.floor(diffMs / 1000))
+  const diffMinutes = Math.floor(diffSeconds / 60)
+
+  if (diffMinutes < 5) return { label: 'Online now', isOnline: true }
+  if (diffMinutes < 60) return { label: `${diffMinutes}m ago`, isOnline: false }
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return { label: `${diffHours}h ago`, isOnline: false }
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 7) return { label: `${diffDays}d ago`, isOnline: false }
+
+  return {
+    label: new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(date),
+    isOnline: false,
+  }
+}
+
 export function getDeviceLabel(notification: NotificationRow): string {
   const joined = Array.isArray(notification.devices) ? notification.devices[0] : notification.devices
   if (!joined) return 'Unknown device'

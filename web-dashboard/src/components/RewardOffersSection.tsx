@@ -168,14 +168,6 @@ export function RewardOffersSection({ userId }: { userId: string }) {
 
   return (
     <section className="panel-section">
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Reward offers</p>
-          <h2>Editable coin redemption offers</h2>
-        </div>
-        <p className="muted">These are stored in Supabase and shown in the Android redemption flow.</p>
-      </div>
-
       {error && <div className="error-box">{error}</div>}
 
       <form className="inline-form" onSubmit={saveOffer}>

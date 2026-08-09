@@ -24,10 +24,12 @@ fun AppRoot(appViewModel: AppViewModel) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    // Ping last_active on every foreground resume.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 appViewModel.refreshRuntimeStatus(context)
+                appViewModel.pingLastActive()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -36,8 +38,11 @@ fun AppRoot(appViewModel: AppViewModel) {
         }
     }
 
+    // Ping on launch and start the 10-minute periodic ping.
     LaunchedEffect(Unit) {
         appViewModel.refreshRuntimeStatus(context)
+        appViewModel.pingLastActive()
+        appViewModel.startPeriodicLastActivePing()
     }
 
     when (state.screen) {

@@ -43,4 +43,7 @@ class SupabaseRepository(
         api.upsertSpinStatus(accessToken, request)
 
     suspend fun fetchServerNow(accessToken: String): Instant? = api.fetchServerNow(accessToken)
+
+    suspend fun updateLastActive(accessToken: String, deviceId: String) =
+        api.updateLastActive(accessToken, deviceId)
 }

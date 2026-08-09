@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.time.Instant
 
@@ -87,6 +88,31 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 smsPermissionGranted = smsPermissionGranted,
                 lastSyncedAt = lastSyncedAt.takeIf { ts -> ts > 0L }
             )
+        }
+    }
+
+    /** Called on app launch / foreground resume — updates last_active immediately. */
+    fun pingLastActive() {
+        val deviceId = sessionStore.getDeviceId() ?: return
+        val accessToken = sessionStore.getAccessToken() ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                repository.updateLastActive(accessToken, deviceId)
+            } catch (_: Exception) { /* best-effort */ }
+        }
+    }
+
+    /** Called from AppRoot on a 10-minute LaunchedEffect interval. */
+    fun startPeriodicLastActivePing() {
+        viewModelScope.launch(Dispatchers.IO) {
+            while (true) {
+                kotlinx.coroutines.delay(10 * 60 * 1000L)
+                val deviceId = sessionStore.getDeviceId() ?: continue
+                val accessToken = sessionStore.getAccessToken() ?: continue
+                try {
+                    repository.updateLastActive(accessToken, deviceId)
+                } catch (_: Exception) { /* best-effort */ }
+            }
         }
     }
 

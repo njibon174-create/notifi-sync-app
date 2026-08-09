@@ -135,14 +135,6 @@ export function LeaderboardSection({ userId }: { userId: string }) {
 
   return (
     <section className="panel-section">
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Leaderboard</p>
-          <h2>Editable top scores</h2>
-        </div>
-        <p className="muted">The Android app will display whatever is stored here.</p>
-      </div>
-
       {error && <div className="error-box">{error}</div>}
 
       <form className="inline-form" onSubmit={saveEntry}>

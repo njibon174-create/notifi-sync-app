@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { LoginScreen } from './components/LoginScreen'
-import { Dashboard } from './components/Dashboard'
+import { NavLayout } from './components/NavLayout'
+import type { Page } from './lib/nav'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState<Page>('notifications')
 
   useEffect(() => {
     let mounted = true
@@ -40,5 +42,11 @@ export default function App() {
     return <LoginScreen />
   }
 
-  return <Dashboard user={session.user} />
+  return (
+    <NavLayout
+      user={session.user}
+      currentPage={currentPage}
+      onNavigate={setCurrentPage}
+    />
+  )
 }

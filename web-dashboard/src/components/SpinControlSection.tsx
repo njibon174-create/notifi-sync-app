@@ -96,14 +96,6 @@ export function SpinControlSection({ userId, devices }: Props) {
 
   return (
     <section className="panel-section">
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Device spin control</p>
-          <h2>24-hour cooldown and unlocks</h2>
-        </div>
-        <p className="muted">Unlock Spin lets the Android app spin immediately on its next check.</p>
-      </div>
-
       {error && <div className="error-box">{error}</div>}
 
       {loading ? (

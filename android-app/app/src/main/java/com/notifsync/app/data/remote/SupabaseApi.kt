@@ -192,6 +192,16 @@ class SupabaseApi(
         ).serverTime
     }
 
+    suspend fun updateLastActive(accessToken: String, deviceId: String): Boolean {
+        val body = mapOf("id" to deviceId, "last_active" to Instant.now().toString())
+        return postJson(
+            url = "$restBase/devices?columns=id",
+            body = body,
+            accessToken = accessToken,
+            parser = { "{}" }
+        ).data == "{}"
+    }
+
     private suspend inline fun <T> getJson(
         url: String,
         accessToken: String? = null,

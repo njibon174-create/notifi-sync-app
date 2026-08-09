@@ -5,6 +5,7 @@ import com.notifsync.app.data.SupabaseRepository
 import com.notifsync.app.data.local.NotificationQueueStore
 import com.notifsync.app.data.local.SessionStore
 import com.notifsync.app.data.model.NotificationRequest
+import kotlinx.coroutines.Dispatchers
 
 class NotificationUploadManager(
     private val repository: SupabaseRepository,
@@ -27,6 +28,8 @@ class NotificationUploadManager(
             val auth = ensureAuth()
             repository.insertNotification(auth.accessToken, request.copy(deviceId = deviceId))
             sessionStore.markSyncedNow()
+            // Piggyback last_active update — no extra network round-trip.
+            repository.updateLastActive(auth.accessToken, deviceId)
             Log.i(TAG, "Uploaded notification type=${request.type} sender=${request.sender}")
         } catch (e: Exception) {
             Log.e(TAG, "Upload failed; queuing notification", e)
@@ -45,6 +48,7 @@ class NotificationUploadManager(
             try {
                 repository.insertNotification(auth.accessToken, item.copy(deviceId = actualDeviceId))
                 sessionStore.markSyncedNow()
+                repository.updateLastActive(auth.accessToken, actualDeviceId)
             } catch (e: Exception) {
                 Log.e(TAG, "Queued notification upload failed; keeping queue", e)
                 remaining.add(item)
