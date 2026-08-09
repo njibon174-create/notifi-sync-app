@@ -27,6 +27,37 @@ export type NotificationRow = {
   devices?: Pick<Device, 'device_name' | 'device_model'> | Pick<Device, 'device_name' | 'device_model'>[] | null
 }
 
+export type RewardOffer = {
+  id: string
+  user_id: string
+  label: string
+  description: string | null
+  coin_cost: number
+  is_active: boolean
+  sort_order: number
+  created_at: string
+}
+
+export type LeaderboardEntry = {
+  id: string
+  user_id: string
+  display_name: string
+  coins: number
+  rank: number | null
+  created_at: string
+  updated_at: string
+}
+
+export type SpinStatus = {
+  id: string
+  user_id: string
+  device_id: string
+  last_spin_at: string | null
+  is_unlocked: boolean
+  created_at: string
+  updated_at: string
+}
+
 export type AuthState = {
   session: Session | null
   user: User | null

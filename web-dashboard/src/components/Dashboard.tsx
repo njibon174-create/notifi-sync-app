@@ -4,7 +4,10 @@ import { supabase } from '../lib/supabase'
 import { formatTimestamp, matchesSearch } from '../lib/format'
 import type { Device, NotificationRow, NotificationType } from '../types'
 import { Filters } from './Filters'
+import { LeaderboardSection } from './LeaderboardSection'
 import { NotificationCard } from './NotificationCard'
+import { RewardOffersSection } from './RewardOffersSection'
+import { SpinControlSection } from './SpinControlSection'
 
 const PAGE_SIZE = 50
 const notificationSelect = '*, devices:devices(device_name, device_model)'
@@ -268,6 +271,10 @@ export function Dashboard({ user }: Props) {
         onTypeChange={setType}
         onSearchChange={setSearch}
       />
+
+      <RewardOffersSection userId={user.id} />
+      <LeaderboardSection userId={user.id} />
+      <SpinControlSection userId={user.id} devices={devices} />
 
       <section className="panel-section">
         <div className="section-heading">

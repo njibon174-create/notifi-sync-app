@@ -16,6 +16,7 @@ import com.notifsync.app.ui.common.LoadingOverlay
 import com.notifsync.app.ui.device.DeviceScreen
 import com.notifsync.app.ui.home.HomeScreen
 import com.notifsync.app.ui.login.LoginScreen
+import com.notifsync.app.ui.rewards.RewardsScreen
 
 @Composable
 fun AppRoot(appViewModel: AppViewModel) {
@@ -46,7 +47,6 @@ fun AppRoot(appViewModel: AppViewModel) {
             onEmailChange = appViewModel::updateEmail,
             onPasswordChange = appViewModel::updatePassword,
             onSubmit = appViewModel::submitAuth,
-            onToggleMode = appViewModel::toggleAuthMode,
             onContinue = appViewModel::checkSession
         )
         Screen.DeviceRegistration -> DeviceScreen(
@@ -58,8 +58,16 @@ fun AppRoot(appViewModel: AppViewModel) {
             state = state,
             onLogout = appViewModel::logout,
             onOpenWhitelist = appViewModel::openAppWhitelist,
+            onOpenRewards = appViewModel::openRewards,
             onRefreshStatus = { appViewModel.refreshRuntimeStatus(context) }
         )
         Screen.AppWhitelist -> AppWhitelistScreen(onBack = appViewModel::showHome)
+        Screen.Rewards -> RewardsScreen(
+            state = state,
+            onBack = appViewModel::showHome,
+            onSpin = appViewModel::spinNow,
+            onClaimOffer = appViewModel::claimRewardOffer,
+            onRefresh = appViewModel::loadRewardsHub
+        )
     }
 }

@@ -8,9 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,7 +22,6 @@ import com.notifsync.app.ui.common.PrimaryButton
 @Composable
 fun LoginScreen(
     state: UiState,
-    onToggleMode: () -> Unit,
     onEmailChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onSubmit: () -> Unit,
@@ -37,15 +33,7 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(text = "Notification Sync", fontSize = 30.sp, color = MaterialTheme.colorScheme.primary)
-        Text(
-            text = if (state.isSignUp) "Create your account" else "Sign in to continue",
-            modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
-        )
-
-        TabRow(selectedTabIndex = if (state.isSignUp) 1 else 0, modifier = Modifier.fillMaxWidth()) {
-            Tab(selected = !state.isSignUp, onClick = { if (state.isSignUp) onToggleMode() }, text = { Text("Login") })
-            Tab(selected = state.isSignUp, onClick = { if (!state.isSignUp) onToggleMode() }, text = { Text("Sign Up") })
-        }
+        Text(text = "Sign in to continue", modifier = Modifier.padding(top = 8.dp, bottom = 24.dp))
 
         AppOutlinedTextField(
             label = "Email",
@@ -71,7 +59,7 @@ fun LoginScreen(
         }
 
         PrimaryButton(
-            text = if (state.isSignUp) "Sign Up" else "Login",
+            text = "Login",
             onClick = onSubmit,
             loading = false,
             modifier = Modifier.padding(top = 24.dp)

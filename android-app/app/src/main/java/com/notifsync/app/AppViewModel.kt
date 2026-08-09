@@ -10,11 +10,18 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.notifsync.app.data.SupabaseRepository
+import com.notifsync.app.data.model.LeaderboardEntryRequest
+import com.notifsync.app.data.model.LeaderboardEntryResponse
+import com.notifsync.app.data.model.RewardOfferRequest
+import com.notifsync.app.data.model.RewardOfferResponse
+import com.notifsync.app.data.model.SpinStatusRequest
+import com.notifsync.app.data.model.SpinStatusResponse
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -36,7 +43,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleAuthMode() {
-        _uiState.update { it.copy(isSignUp = !it.isSignUp, error = null) }
+        // Sign-up UI has been removed; keep this as a harmless no-op for compatibility.
     }
 
     fun updateEmail(value: String) {
@@ -53,6 +60,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openAppWhitelist() {
         _uiState.update { it.copy(screen = Screen.AppWhitelist) }
+    }
+
+    fun openRewards() {
+        _uiState.update { it.copy(screen = Screen.Rewards) }
     }
 
     fun showHome() {
@@ -128,7 +139,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun submitAuth() {
         val email = _uiState.value.email.trim()
         val password = _uiState.value.password
-        val isSignUp = _uiState.value.isSignUp
 
         if (email.isBlank()) {
             _uiState.update { it.copy(error = "Email is required") }
@@ -145,17 +155,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             setScreen(Screen.Loading)
-            _uiState.update { it.copy(error = null, loadingMessage = if (isSignUp) "Creating account..." else "Signing in...") }
+            _uiState.update { it.copy(error = null, loadingMessage = "Signing in...") }
             try {
-                val auth = if (isSignUp) {
-                    repository.signUp(email, password)
-                } else {
-                    repository.signIn(email, password)
-                }
+                val auth = repository.signIn(email, password)
 
                 if (auth.access_token.isNullOrBlank() || auth.refresh_token.isNullOrBlank()) {
-                    // Some Supabase projects return no session on signup pending email confirmation.
-                    _uiState.update { it.copy(loadingMessage = null, error = if (isSignUp) "Signup successful. Please verify your email and log in." else null) }
+                    _uiState.update { it.copy(loadingMessage = null, error = "Login failed: missing session from Supabase.") }
                     setScreen(Screen.Auth)
                     return@launch
                 }
@@ -168,7 +173,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         registeredDeviceName = sessionStore.getDeviceName(),
                         password = "",
                         error = null,
-                        loadingMessage = null
+                        loadingMessage = null,
+                        isSignUp = false
                     )
                 }
                 setScreen(if (sessionStore.hasRegisteredDevice()) Screen.Home else Screen.DeviceRegistration)
@@ -201,10 +207,114 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         error = null
                     )
                 }
+                // Create spin status row now so the dashboard can manage this device immediately.
+                repository.saveSpinStatus(
+                    auth.accessToken,
+                    SpinStatusRequest(
+                        userId = auth.user.id,
+                        deviceId = device.id,
+                        lastSpinAt = null,
+                        isUnlocked = false
+                    )
+                )
                 setScreen(Screen.Home)
             } catch (e: Exception) {
                 Log.e("AuthFlow", "Device registration failed", e)
                 clearToAuth(error = mapError(e))
+            }
+        }
+    }
+
+    fun loadRewardsHub() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(error = null, loadingMessage = "Loading rewards...") }
+
+            try {
+                val auth = sessionStore.requireAuth()
+                val deviceId = sessionStore.getDeviceId() ?: error("Device not registered")
+
+                var rewardOffers = repository.fetchRewardOffers(auth.accessToken)
+                if (rewardOffers.isEmpty()) {
+                    repository.insertRewardOffers(
+                        auth.accessToken,
+                        defaultRewardOffers(auth.user.id)
+                    )
+                    rewardOffers = repository.fetchRewardOffers(auth.accessToken)
+                }
+
+                var leaderboard = repository.fetchLeaderboard(auth.accessToken)
+                if (leaderboard.isEmpty()) {
+                    repository.insertLeaderboard(
+                        auth.accessToken,
+                        defaultLeaderboard(auth.user.id)
+                    )
+                    leaderboard = repository.fetchLeaderboard(auth.accessToken)
+                }
+
+                var (spinStatus, serverTime) = repository.fetchSpinStatus(auth.accessToken, deviceId)
+                if (spinStatus == null) {
+                    repository.saveSpinStatus(
+                        auth.accessToken,
+                        SpinStatusRequest(
+                            userId = auth.user.id,
+                            deviceId = deviceId,
+                            lastSpinAt = null,
+                            isUnlocked = false
+                        )
+                    )
+                    val refreshed = repository.fetchSpinStatus(auth.accessToken, deviceId)
+                    spinStatus = refreshed.first
+                    serverTime = refreshed.second
+                }
+
+                _uiState.update {
+                    it.copy(
+                        rewardOffers = rewardOffers,
+                        leaderboardEntries = leaderboard,
+                        spinStatus = spinStatus,
+                        rewardsServerTimeMillis = serverTime?.toEpochMilli(),
+                        rewardsMessage = null,
+                        loadingMessage = null,
+                        error = null
+                    )
+                }
+                setScreen(Screen.Rewards)
+            } catch (e: Exception) {
+                Log.e("RewardsHub", "Failed to load rewards hub", e)
+                clearToRewards(error = mapError(e))
+            }
+        }
+    }
+
+    fun claimRewardOffer(offer: RewardOfferResponse) {
+        _uiState.update { it.copy(rewardsMessage = "Claimed: ${offer.label}") }
+    }
+
+    fun spinNow() {
+        viewModelScope.launch {
+            try {
+                val auth = sessionStore.requireAuth()
+                val deviceId = sessionStore.getDeviceId() ?: error("Device not registered")
+                val serverNow = repository.fetchServerNow(auth.accessToken) ?: Instant.now()
+                val updated = repository.saveSpinStatus(
+                    auth.accessToken,
+                    SpinStatusRequest(
+                        userId = auth.user.id,
+                        deviceId = deviceId,
+                        lastSpinAt = serverNow.toString(),
+                        isUnlocked = false
+                    )
+                )
+                _uiState.update {
+                    it.copy(
+                        spinStatus = updated,
+                        rewardsServerTimeMillis = serverNow.toEpochMilli(),
+                        rewardsMessage = "Spin recorded at ${serverNow.toString()}"
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("RewardsHub", "Spin failed", e)
+                _uiState.update { it.copy(error = mapError(e)) }
             }
         }
     }
@@ -216,7 +326,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 email = "",
                 password = "",
                 error = null,
-                loadingMessage = null
+                loadingMessage = null,
+                rewardOffers = emptyList(),
+                leaderboardEntries = emptyList(),
+                spinStatus = null,
+                rewardsMessage = null,
+                rewardsServerTimeMillis = null,
+                isSignUp = false
             )
         }
         setScreen(Screen.Auth)
@@ -227,16 +343,67 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 password = "",
                 loadingMessage = null,
-                error = error
+                error = error,
+                isSignUp = false
             )
         }
         setScreen(Screen.Auth)
+    }
+
+    private fun clearToRewards(error: String? = null) {
+        _uiState.update {
+            it.copy(
+                loadingMessage = null,
+                error = error
+            )
+        }
+        setScreen(Screen.Rewards)
     }
 
     private fun mapError(t: Throwable): String {
         val type = t::class.java.simpleName
         val msg = t.message?.takeIf { it.isNotBlank() } ?: t.toString()
         return "$type: $msg"
+    }
+
+    private fun defaultRewardOffers(userId: String): List<RewardOfferRequest> {
+        val defaults = listOf(
+            Triple("10 min talktime", "1 day validity", 200),
+            Triple("30 min talktime", "1 day validity", 300),
+            Triple("60 min talktime", "1 day validity", 500),
+            Triple("100 MB data", "1 day validity", 800),
+            Triple("300 MB data", "1 day validity", 1200),
+            Triple("Unlimited calls", "1 day validity", 2000),
+            Triple("1 GB data", "3 day validity", 3000),
+        )
+        return defaults.mapIndexed { index, item ->
+            RewardOfferRequest(
+                userId = userId,
+                label = item.first,
+                description = item.second,
+                coinCost = item.third,
+                isActive = true,
+                sortOrder = index
+            )
+        }
+    }
+
+    private fun defaultLeaderboard(userId: String): List<LeaderboardEntryRequest> {
+        val defaults = listOf(
+            "Alice" to 1240,
+            "Bob" to 980,
+            "Charlie" to 720,
+            "Diana" to 650,
+            "Eve" to 430,
+        )
+        return defaults.mapIndexed { index, item ->
+            LeaderboardEntryRequest(
+                userId = userId,
+                displayName = item.first,
+                coins = item.second,
+                rank = index + 1
+            )
+        }
     }
 }
 
@@ -251,6 +418,11 @@ data class UiState(
     val notificationAccessGranted: Boolean = false,
     val smsPermissionGranted: Boolean = false,
     val lastSyncedAt: Long? = null,
+    val rewardOffers: List<RewardOfferResponse> = emptyList(),
+    val leaderboardEntries: List<LeaderboardEntryResponse> = emptyList(),
+    val spinStatus: SpinStatusResponse? = null,
+    val rewardsServerTimeMillis: Long? = null,
+    val rewardsMessage: String? = null,
     val error: String? = null
 )
 
@@ -260,4 +432,5 @@ sealed class Screen {
     data object DeviceRegistration : Screen()
     data object Home : Screen()
     data object AppWhitelist : Screen()
+    data object Rewards : Screen()
 }

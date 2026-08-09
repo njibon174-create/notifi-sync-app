@@ -32,6 +32,7 @@ fun HomeScreen(
     state: UiState,
     onLogout: () -> Unit,
     onOpenWhitelist: () -> Unit,
+    onOpenRewards: () -> Unit,
     onRefreshStatus: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -101,6 +102,19 @@ fun HomeScreen(
                         )
                     }
                 )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(text = "Rewards & Spin")
+                Text(text = "Manage coin offers, leaderboard, and the 24-hour spin cooldown.")
+                Button(onClick = onOpenRewards) {
+                    Text("Open Rewards Hub")
+                }
             }
         }
 

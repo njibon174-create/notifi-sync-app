@@ -55,3 +55,6 @@ This project is ready for a static Vercel deployment.
 - Realtime subscription for new notifications
 - Load-more pagination
 - Delete individual notifications, clear all notifications, and remove devices (device deletion cascades to notifications)
+- Reward offers management with add/edit/delete/reorder
+- Leaderboard management with add/edit/delete
+- Device spin control with unlock/reset actions
