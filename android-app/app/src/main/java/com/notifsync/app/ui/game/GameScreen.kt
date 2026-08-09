@@ -259,7 +259,7 @@ fun GameScreen(
                         if (!spinReady || isSpinning) return@Button
                         // Select outcome BEFORE animation: 1% gifts, 99% coins.
                         val random = Math.random()
-                        val outcome = if (random < 0.01) {
+                        val outcome = if (random <= 0.01) {
                             segments.filter { it.type == "gift" }.random()
                         } else {
                             segments.filter { it.type == "coin" }.random()

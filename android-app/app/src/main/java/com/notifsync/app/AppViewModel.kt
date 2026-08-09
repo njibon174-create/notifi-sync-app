@@ -144,6 +144,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                     setScreen(if (sessionStore.hasRegisteredDevice()) Screen.Game else Screen.DeviceRegistration)
+                    if (sessionStore.hasRegisteredDevice()) {
+                        loadGameScreen()
+                    }
                     return@launch
                 }
 
@@ -160,6 +163,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                     setScreen(if (sessionStore.hasRegisteredDevice()) Screen.Game else Screen.DeviceRegistration)
+                    if (sessionStore.hasRegisteredDevice()) {
+                        loadGameScreen()
+                    }
                     return@launch
                 }
 
@@ -213,6 +219,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 setScreen(if (sessionStore.hasRegisteredDevice()) Screen.Game else Screen.DeviceRegistration)
+                if (sessionStore.hasRegisteredDevice()) {
+                    loadGameScreen()
+                }
             } catch (e: Exception) {
                 Log.e("AuthFlow", "Auth submit failed", e)
                 clearToAuth(error = mapError(e))
@@ -468,12 +477,32 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     finalBalance = wallet.balance
                 }
 
+                // ── Upsert leaderboard entry so leaderboard UI shows current user's coins ─
+                val entries = repository.fetchLeaderboard(auth.accessToken)
+                val existingEntry = entries.firstOrNull { it.userId == auth.userId }
+                if (existingEntry != null) {
+                    repository.updateLeaderboardCoins(auth.accessToken, existingEntry.id, finalBalance)
+                } else {
+                    repository.insertLeaderboard(
+                        auth.accessToken,
+                        listOf(
+                            LeaderboardEntryRequest(
+                                userId = auth.userId,
+                                displayName = auth.email.substringBefore("@"),
+                                coins = finalBalance
+                            )
+                        )
+                    )
+                }
+                val refreshedEntries = repository.fetchLeaderboard(auth.accessToken)
+
                 // ── Update UI ────────────────────────────────────────────────────────
                 _uiState.update {
                     it.copy(
                         spinStatus = updatedSpinStatus,
                         rewardsServerTimeMillis = serverTime.toEpochMilli(),
                         walletBalance = finalBalance,
+                        leaderboardEntries = refreshedEntries,
                         rewardsMessage = if (outcome.type == "gift")
                             "🎁 ${outcome.label}!"
                         else
