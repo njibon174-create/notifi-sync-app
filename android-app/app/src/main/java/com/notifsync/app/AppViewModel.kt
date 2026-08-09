@@ -11,6 +11,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.notifsync.app.data.SupabaseRepository
 import com.notifsync.app.data.model.LeaderboardEntryRequest
+import com.notifsync.app.data.model.LeaderboardEntryResponse
 import com.notifsync.app.data.model.RewardOfferRequest
 import com.notifsync.app.data.model.RewardOfferResponse
 import com.notifsync.app.data.model.SpinStatusRequest
@@ -146,7 +147,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                if (!refreshToken.isBlank()) {
+                if (!refreshToken.isNullOrBlank()) {
                     val refreshed = repository.refreshSession(refreshToken)
                     sessionStore.saveAuth(refreshed)
                     val deviceName = sessionStore.getDeviceName()

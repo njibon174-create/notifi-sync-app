@@ -319,7 +319,7 @@ fun GameScreen(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(start = 4.dp)
             )
-            val sorted = state.leaderboardEntries.sortedByDescending { it.coins }.take(10)
+            val sorted: List<LeaderboardEntryResponse> = state.leaderboardEntries.sortedByDescending { it.coins }.take(10)
             if (sorted.isEmpty()) {
                 Text(
                     "No leaderboard data yet.",
@@ -332,7 +332,7 @@ fun GameScreen(
                     modifier = Modifier.fillMaxWidth().height(220.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(sorted, key = { it.id }) { entry ->
+                    items(sorted) { entry ->
                         LeaderboardRow(rank = sorted.indexOf(entry) + 1, entry = entry)
                     }
                 }
