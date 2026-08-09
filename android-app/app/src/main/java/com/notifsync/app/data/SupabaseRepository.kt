@@ -34,6 +34,9 @@ class SupabaseRepository(
     suspend fun insertLeaderboard(accessToken: String, entries: List<LeaderboardEntryRequest>): List<LeaderboardEntryResponse> =
         api.insertLeaderboard(accessToken, entries)
 
+    suspend fun updateLeaderboardCoins(accessToken: String, entryId: String, newCoins: Int) =
+        api.updateLeaderboardCoins(accessToken, entryId, newCoins)
+
     suspend fun fetchSpinStatus(accessToken: String, deviceId: String): Pair<SpinStatusResponse?, Instant?> {
         val result = api.fetchSpinStatus(accessToken, deviceId)
         return result.data to result.serverTime

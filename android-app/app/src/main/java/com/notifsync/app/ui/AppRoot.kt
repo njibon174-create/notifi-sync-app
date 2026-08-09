@@ -14,6 +14,7 @@ import com.notifsync.app.Screen
 import com.notifsync.app.ui.apps.AppWhitelistScreen
 import com.notifsync.app.ui.common.LoadingOverlay
 import com.notifsync.app.ui.device.DeviceScreen
+import com.notifsync.app.ui.game.GameScreen
 import com.notifsync.app.ui.home.HomeScreen
 import com.notifsync.app.ui.login.LoginScreen
 import com.notifsync.app.ui.rewards.RewardsScreen
@@ -63,7 +64,7 @@ fun AppRoot(appViewModel: AppViewModel) {
             state = state,
             onLogout = appViewModel::logout,
             onOpenWhitelist = appViewModel::openAppWhitelist,
-            onOpenRewards = appViewModel::openRewards,
+            onOpenRewards = appViewModel::openGame,
             onRefreshStatus = { appViewModel.refreshRuntimeStatus(context) }
         )
         Screen.AppWhitelist -> AppWhitelistScreen(onBack = appViewModel::showHome)
@@ -73,6 +74,15 @@ fun AppRoot(appViewModel: AppViewModel) {
             onSpin = appViewModel::spinNow,
             onClaimOffer = appViewModel::claimRewardOffer,
             onRefresh = appViewModel::loadRewardsHub
+        )
+        Screen.Game -> GameScreen(
+            state = state,
+            onBack = appViewModel::showHome,
+            onSpin = { coinsEarned, label -> appViewModel.saveSpinResult(coinsEarned, label) },
+            onOpenWhitelist = appViewModel::openAppWhitelist,
+            onRedeem = appViewModel::openRedeem,
+            onLogout = appViewModel::logout,
+            onRefresh = appViewModel::loadGameScreen
         )
     }
 }

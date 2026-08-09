@@ -17,6 +17,8 @@ import com.notifsync.app.data.model.RewardOfferRequest
 import com.notifsync.app.data.model.RewardOfferResponse
 import com.notifsync.app.data.model.SpinStatusRequest
 import com.notifsync.app.data.model.SpinStatusResponse
+import com.notifsync.app.data.model.WheelConfigResponse
+import com.notifsync.app.data.model.WheelSegment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -200,6 +202,44 @@ class SupabaseApi(
             accessToken = accessToken,
             parser = { "{}" }
         ).data == "{}"
+    }
+
+    suspend fun fetchWheelConfig(accessToken: String, userId: String): ApiResult<WheelConfigResponse?> {
+        return getJson(
+            url = "$restBase/wheel_config?select=*&user_id=eq.$userId",
+            accessToken = accessToken,
+            parser = {
+                val type = object : TypeToken<List<WheelConfigResponse>>() {}.type
+                gson.fromJson<List<WheelConfigResponse>>(it, type).firstOrNull()
+            }
+        )
+    }
+
+    suspend fun upsertWheelConfig(accessToken: String, userId: String, segments: List<WheelSegment>): WheelConfigResponse {
+        val body = mapOf(
+            "user_id" to userId,
+            "segments" to segments
+        )
+        return postJson(
+            url = "$restBase/wheel_config?on_conflict=user_id",
+            body = body,
+            accessToken = accessToken,
+            parser = {
+                val type = object : TypeToken<List<WheelConfigResponse>>() {}.type
+                gson.fromJson<List<WheelConfigResponse>>(it, type).firstOrNull()
+                    ?: error("Wheel config upsert returned no rows")
+            }
+        ).data
+    }
+
+    suspend fun updateLeaderboardCoins(accessToken: String, entryId: String, newCoins: Int) {
+        val body = mapOf("id" to entryId, "coins" to newCoins)
+        postJson(
+            url = "$restBase/leaderboard?columns=id,coins",
+            body = body,
+            accessToken = accessToken,
+            parser = { "{}" }
+        )
     }
 
     private suspend inline fun <T> getJson(

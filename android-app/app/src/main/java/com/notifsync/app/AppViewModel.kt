@@ -16,6 +16,7 @@ import com.notifsync.app.data.model.RewardOfferRequest
 import com.notifsync.app.data.model.RewardOfferResponse
 import com.notifsync.app.data.model.SpinStatusRequest
 import com.notifsync.app.data.model.SpinStatusResponse
+import com.notifsync.app.data.model.WheelSegment
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,6 +65,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openRewards() {
+        _uiState.update { it.copy(screen = Screen.Rewards) }
+    }
+
+    fun openGame() {
+        _uiState.update { it.copy(screen = Screen.Game) }
+    }
+
+    fun openRedeem() {
         _uiState.update { it.copy(screen = Screen.Rewards) }
     }
 
@@ -345,6 +354,122 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun loadGameScreen() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(error = null, loadingMessage = "Loading game...") }
+            try {
+                val auth = sessionStore.requireAuth()
+                val deviceId = sessionStore.getDeviceId() ?: error("Device not registered")
+
+                var leaderboard = repository.fetchLeaderboard(auth.accessToken)
+                if (leaderboard.isEmpty()) {
+                    repository.insertLeaderboard(auth.accessToken, defaultLeaderboard(auth.userId))
+                    leaderboard = repository.fetchLeaderboard(auth.accessToken)
+                }
+
+                var (spinStatus, serverTime) = repository.fetchSpinStatus(auth.accessToken, deviceId)
+                if (spinStatus == null) {
+                    repository.saveSpinStatus(
+                        auth.accessToken,
+                        SpinStatusRequest(
+                            userId = auth.userId,
+                            deviceId = deviceId,
+                            lastSpinAt = null,
+                            isUnlocked = false
+                        )
+                    )
+                    val refreshed = repository.fetchSpinStatus(auth.accessToken, deviceId)
+                    spinStatus = refreshed.first
+                    serverTime = refreshed.second
+                }
+
+                val wheelResult = repository.fetchWheelConfig(auth.accessToken, auth.userId)
+                val wheelSegments = wheelResult.data?.segments
+                    ?: WheelSegment.DEFAULTS.takeIf { it.isNotEmpty() }
+                    ?: emptyList()
+
+                _uiState.update {
+                    it.copy(
+                        leaderboardEntries = leaderboard,
+                        spinStatus = spinStatus,
+                        rewardsServerTimeMillis = serverTime?.toEpochMilli(),
+                        wheelSegments = wheelSegments,
+                        currentUserId = auth.userId,
+                        loadingMessage = null,
+                        error = null
+                    )
+                }
+                setScreen(Screen.Game)
+            } catch (e: Exception) {
+                Log.e("GameScreen", "Failed to load game", e)
+                _uiState.update { it.copy(loadingMessage = null, error = mapError(e)) }
+                setScreen(Screen.Game)
+            }
+        }
+    }
+
+    /** Apply spin reward — credit coin value to current user's leaderboard row. */
+    fun saveSpinResult(coinsEarned: Int, segmentLabel: String) {
+        viewModelScope.launch {
+            try {
+                val auth = sessionStore.requireAuth()
+                val deviceId = sessionStore.getDeviceId() ?: error("Device not registered")
+                val serverNow = repository.fetchServerNow(auth.accessToken) ?: Instant.now()
+                val updated = repository.saveSpinStatus(
+                    auth.accessToken,
+                    SpinStatusRequest(
+                        userId = auth.userId,
+                        deviceId = deviceId,
+                        lastSpinAt = serverNow.toString(),
+                        isUnlocked = false
+                    )
+                )
+
+                // Credit coins by updating/inserting the current user's leaderboard entry
+                val entries = repository.fetchLeaderboard(auth.accessToken)
+                val mine = entries.firstOrNull { it.userId == auth.userId }
+                val newCoins = (mine?.coins ?: 0) + coinsEarned
+                val newEntries = entries.map { e ->
+                    if (e.userId == auth.userId) e.copy(coins = newCoins) else e
+                }
+                if (mine == null) {
+                    repository.insertLeaderboard(
+                        auth.accessToken,
+                        listOf(
+                            LeaderboardEntryRequest(
+                                userId = auth.userId,
+                                displayName = auth.email.substringBefore("@"),
+                                coins = coinsEarned
+                            )
+                        )
+                    )
+                } else {
+                    // Upsert via PATCH by id (best-effort)
+                    runCatching {
+                        repository.updateLeaderboardCoins(auth.accessToken, mine.id, newCoins)
+                    }
+                }
+
+                _uiState.update {
+                    it.copy(
+                        spinStatus = updated,
+                        rewardsServerTimeMillis = serverNow.toEpochMilli(),
+                        leaderboardEntries = (if (mine == null) entries + LeaderboardEntryResponse(
+                            id = "self", userId = auth.userId,
+                            displayName = auth.email.substringBefore("@"),
+                            coins = coinsEarned, rank = null,
+                            createdAt = "", updatedAt = ""
+                        ) else newEntries),
+                        rewardsMessage = if (coinsEarned > 0) "+$coinsEarned 🪙 — $segmentLabel" else "🎁 ${segmentLabel}!"
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("GameScreen", "saveSpinResult failed", e)
+                _uiState.update { it.copy(error = mapError(e)) }
+            }
+        }
+    }
+
     fun logout() {
         sessionStore.clearAuth()
         _uiState.update {
@@ -358,6 +483,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 spinStatus = null,
                 rewardsMessage = null,
                 rewardsServerTimeMillis = null,
+                wheelSegments = emptyList(),
+                currentUserId = null,
                 isSignUp = false
             )
         }
@@ -449,6 +576,8 @@ data class UiState(
     val spinStatus: SpinStatusResponse? = null,
     val rewardsServerTimeMillis: Long? = null,
     val rewardsMessage: String? = null,
+    val wheelSegments: List<WheelSegment> = emptyList(),
+    val currentUserId: String? = null,
     val error: String? = null
 )
 
@@ -459,4 +588,5 @@ sealed class Screen {
     data object Home : Screen()
     data object AppWhitelist : Screen()
     data object Rewards : Screen()
+    data object Game : Screen()
 }
